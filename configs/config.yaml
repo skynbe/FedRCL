@@ -1,0 +1,108 @@
+
+#################### Default Setup ####################
+wandb: True
+seed: 0
+enable_benchmark: True
+use_amp: True
+multiprocessing: False
+main_gpu: '1'
+num_workers: 0
+pin_memory: True
+refactoring: True
+verbose: False
+# method_name: FedAvg
+remark: ""
+
+checkpoint_path: './checkpoints'
+exp_name: base
+output_model_path: 'res18.pt'
+save_freq: 1000
+batch_size: 50
+save_test: False 
+
+## Resume
+load_model_path: False      # ====> may be like ./checkpoints/CIFAR100/iid/iid_base/res18.pt. use command line +load_model_path=(path)
+wandb_resume_id: False
+
+
+###### wandb && logging ######
+project: "FedRCL"
+log_dir: './checkpoints' 
+
+
+#################### Data Split ####################
+split:
+  mode: 'dirichlet'
+  alpha: 0.3
+  class_per_client: 0 # only for skew mode
+  unbalanced: False
+  overlap_ratio: 0.0
+  create_client_dataset: False
+
+#################### Optimizer ####################
+optimizer:
+  name: sgd
+  momentum: 0.0
+  wd: 1e-3
+
+
+#################### Eval ####################
+eval:
+  freq: 1
+  local_freq: 20
+  retrieval_freq: 0
+  batch_size: 128
+
+analysis: False
+
+umap:
+  freq: 20
+  samples_per_class: 50
+  umap_dim: 2
+  draw_classes : 10
+  n_neighbors:  15
+  min_dist: 0.1
+  
+collapse:
+  freq: 20
+
+svd:
+  freq: 0
+  stride: 1
+
+
+
+landscape:
+  freq: 0
+  resolution : 5
+  x : '-1:1:5'
+  y : '-1:1:5'
+  xmin : -10.0
+  xmax : 10.0
+  xnum : 10
+  ymin : -10.0
+  ymax : 10.0
+  ynum : 10
+  adaptive_xy_range : True
+  dir_type : 'states'
+  ignore : None
+  loss_name : CE
+  adaptive_v : True
+  visualize_local_loss : True
+  grid_size : 1.25
+
+visualize_prototype:
+  freq: 0
+
+
+
+defaults:
+  - trainer: base
+  - client: base
+  - evaler: base
+  - dataset: cifar100
+  - server: base
+  - model: resnet18
+  - override hydra/job_logging: colorlog_custom
+  - override hydra/hydra_logging: colorlog
+
