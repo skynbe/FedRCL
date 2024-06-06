@@ -1,6 +1,6 @@
 
 #################### Default Setup ####################
-wandb: True
+wandb: False
 seed: 0
 enable_benchmark: True
 use_amp: True
@@ -49,51 +49,9 @@ optimizer:
 #################### Eval ####################
 eval:
   freq: 1
-  local_freq: 20
-  retrieval_freq: 0
   batch_size: 128
 
 analysis: False
-
-umap:
-  freq: 20
-  samples_per_class: 50
-  umap_dim: 2
-  draw_classes : 10
-  n_neighbors:  15
-  min_dist: 0.1
-  
-collapse:
-  freq: 20
-
-svd:
-  freq: 0
-  stride: 1
-
-
-
-landscape:
-  freq: 0
-  resolution : 5
-  x : '-1:1:5'
-  y : '-1:1:5'
-  xmin : -10.0
-  xmax : 10.0
-  xnum : 10
-  ymin : -10.0
-  ymax : 10.0
-  ynum : 10
-  adaptive_xy_range : True
-  dir_type : 'states'
-  ignore : None
-  loss_name : CE
-  adaptive_v : True
-  visualize_local_loss : True
-  grid_size : 1.25
-
-visualize_prototype:
-  freq: 0
-
 
 
 defaults:

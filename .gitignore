@@ -1,18 +1,7 @@
 wandb
 */__pycache__/
-*/*/__pycache__/
-*/*/*/__pycache__/
 *.pyc
-*/*/*.pyc
-args_dir/__pycache__/*.pyc
-visualizations/*
-data/*/*/
-data
-data1
 checkpoints/**
 */.ipynb_checkpoints/
-*/*/.ipynb_checkpoints/
-*/*/*/.ipynb_checkpoints/
-*/*/*/*/.ipynb_checkpoints/
 __pycache__/
 

@@ -60,11 +60,8 @@ class Trainer():
         mode = self.args.split.mode 
         if self.args.split.mode == 'dirichlet':
             mode += str(self.args.split.alpha)
-        # elif self.args.split.mode == 'skew':
-        #     mode += str(self.args.split.class_per_client)
         self.exp_path = self.checkpoint_path / self.args.dataset.name / mode / self.args.exp_name
         logger.info(f"Exp path : {self.exp_path}")
-
 
         ### training config
         trainer_args = self.args.trainer
@@ -181,7 +178,6 @@ class Trainer():
                 assert(self.args.server.momentum > 0)
                 self.model= copy.deepcopy(self.server.FedACG_lookahead(copy.deepcopy(self.model)))
                 global_state_dict = copy.deepcopy(self.model.state_dict())
-
 
             # Client-side
             start = time.time()

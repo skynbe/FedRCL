@@ -3,3 +3,4 @@ name: 'CIFAR100'
 path: './data'
 client_path: "./client_data"
 num_instances: 0
+download: True

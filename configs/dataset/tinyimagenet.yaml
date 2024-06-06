@@ -1,6 +1,6 @@
 ### dataset ###
 name: 'TinyImageNet'
-path: '/root/data'
+path: './data'
 client_path: "./client_data"
 num_instances: 0
 download: False # place TinyImageNet dataset to the above path

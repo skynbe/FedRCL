@@ -25,7 +25,7 @@ from clients import Client
 
 
 @CLIENT_REGISTRY.register()
-class MetricClient(Client):
+class RCLClient(Client):
 
     def __init__(self, args, client_index, model):
         self.args = args
@@ -35,22 +35,14 @@ class MetricClient(Client):
         self.model = model
         self.global_model = copy.deepcopy(model)
 
-        self.metric_criterions = {'metric': None, 'metric2': None, 'metric3': None, 'metric4': None, }
-        args_metric = args.client.metric_loss
+        self.rcl_criterions = {'scl': None, 'penalty': None, }
+        args_rcl = args.client.rcl_loss
         self.global_epoch = 0
 
         self.pairs = {}
-        for pair in args_metric.pairs:
+        for pair in args_rcl.pairs:
             self.pairs[pair.name] = pair
-            if args_metric.get('criterion_type'):
-                if args_metric.criterion_type == 'unsupervised':
-                    self.metric_criterions[pair.name] = UnsupMetricLoss(pair=pair, **args_metric)
-                elif args_metric.criterion_type == 'subset':
-                    self.metric_criterions[pair.name] = MetricLossSubset(pair=pair, **args_metric)
-                else:
-                    raise ValueError
-            else:
-                self.metric_criterions[pair.name] = MetricLoss(pair=pair, **args_metric)
+            self.rcl_criterions[pair.name] = CLLoss(pair=pair, **args_rcl)
         
         self.criterion = nn.CrossEntropyLoss()
 
@@ -100,22 +92,21 @@ class MetricClient(Client):
             # logger.info(f"Sorted class dict : {sorted_class_dict}")
 
         self.sorted_class_dict = sorted_class_dict
-
         self.trainer = trainer
 
 
-    def _algorithm_metric(self, local_results, global_results, labels,):
+    def _algorithm_rcl(self, local_results, global_results, labels,):
 
         losses = {
             'cossim': [],
         }
 
-        metric_args = self.args.client.metric_loss
+        rcl_args = self.args.client.rcl_loss
 
         for l in range(self.num_layers):
 
             train_layer = False
-            if metric_args.branch_level is False or l in metric_args.branch_level:
+            if rcl_args.branch_level is False or l in rcl_args.branch_level:
                 train_layer = True
                 
             local_feature_l = local_results[f"layer{l}"]
@@ -132,24 +123,23 @@ class MetricClient(Client):
                 loss_cossim = F.cosine_embedding_loss(local_feature_l.squeeze(-1).squeeze(-1), global_feature_l.squeeze(-1).squeeze(-1), torch.ones_like(labels))
             losses['cossim'].append(loss_cossim)
 
-            # Metric Loss
+            # RCL Loss
             if train_layer:
-                for metric_name in self.metric_criterions:
-                    metric_criterion = self.metric_criterions[metric_name]
+                for sub_loss_name in self.rcl_criterions:
+                    rcl_criterion = self.rcl_criterions[sub_loss_name]
 
-                    if metric_criterion is not None:
-                        if metric_criterion.pair.get('branch_level'):
-                            train_layer = l in metric_criterion.pair.branch_level
+                    if rcl_criterion is not None:
+                        if rcl_criterion.pair.get('branch_level'):
+                            train_layer = l in rcl_criterion.pair.branch_level
 
                         if train_layer:
-                            loss_metric = metric_criterion(old_feat=global_feature_l, new_feat=local_feature_l, target=labels,
-                                                        reduction=False, topk_neg=metric_args.topk_neg,
-                                                        level=l, progress=self.current_progress)
+                            loss_rcl = rcl_criterion(old_feat=global_feature_l, new_feat=local_feature_l, target=labels,
+                                                        reduction=False, topk_neg=rcl_args.topk_neg,)
 
-                            if metric_name not in losses:
-                                losses[metric_name] = []
+                            if sub_loss_name not in losses:
+                                losses[sub_loss_name] = []
                             
-                            losses[metric_name].append(loss_metric.mean())
+                            losses[sub_loss_name].append(loss_rcl.mean())
 
 
         for loss_name in losses:
@@ -164,7 +154,7 @@ class MetricClient(Client):
     def _algorithm(self, images, labels, ) -> Dict:
 
         losses = defaultdict(float)
-        no_relu = not self.args.client.metric_loss.feature_relu
+        no_relu = not self.args.client.rcl_loss.feature_relu
         results = self.model(images, no_relu=no_relu)
         with torch.no_grad():
             global_results = self.global_model(images, no_relu=no_relu)
@@ -173,9 +163,6 @@ class MetricClient(Client):
         cls_loss = self.criterion(results["logit"], labels)
         losses["cls"] = cls_loss
 
-        uniform_loss = KL_u_p_loss(results["logit"]).mean()
-        losses["uniform"] = uniform_loss
-
         ## Prox Loss
         prox_loss = 0
         fixed_params = {n:p for n,p in self.global_model.named_parameters()}
@@ -183,7 +170,7 @@ class MetricClient(Client):
             prox_loss += ((p-fixed_params[n].detach())**2).sum()  
         losses["prox"] = prox_loss
 
-        losses.update(self._algorithm_metric(local_results=results, global_results=global_results, labels=labels,))               
+        losses.update(self._algorithm_rcl(local_results=results, global_results=global_results, labels=labels,))               
 
         features = {
             "local": results,
@@ -195,18 +182,16 @@ class MetricClient(Client):
 
     # @property
     def get_weights(self, epoch=None):
-        args_metric = self.args.client.metric_loss
 
         weights = {
             "cls": self.args.client.ce_loss.weight,
             "cossim": self.args.client.feature_align_loss.weight,
-            "uniform": self.args.client.ce_loss.get('uniform_weight') or 0,
         }
 
         if self.args.client.get('prox_loss'):
             weights['prox'] = self.args.client.prox_loss.weight
 
-        for pair in args_metric.pairs:
+        for pair in self.args.client.rcl_loss.pairs:
             weights[pair.name] = pair.weight
         return weights
 
@@ -227,12 +212,10 @@ class MetricClient(Client):
         loss_meter = AverageMeter('Loss', ':.2f')
         time_meter = AverageMeter('BatchTime', ':3.1f')
 
-        # logger.info(f"[Client {self.client_index}] Local training start")
         self.weights = self.get_weights(epoch=global_epoch)
 
         if global_epoch % 50 == 0:
             print(self.weights)
-            print(self.pairs)
             
         for local_epoch in range(self.args.trainer.local_epochs):
 
